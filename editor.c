@@ -1,4 +1,14 @@
-//https://codeforwin.org/2018/02/c-program-find-and-replace-a-word-in-file.html
+//  TO DO
+// 1- add > functionality for all commands
+// 2- replace "cow" "smt" remove "" from strings
+// 3- single sequential mode
+// 4- threaded mode
+
+// LOW PRIORITY
+// fix tail method to not use midAlter
+// make another mode to run commands with both : and ; 
+// fix code inside main, It is a mess.
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,12 +17,6 @@
 #define WORD_LEN_MAX 100                                                       
 #define LINE_LEN_MAX 512
 #define NUMBER_OF_COMMAND 10
-
-/*s truct thread_args
- {
-    char *filename;
-    int count;
-}; */
 
 struct thread_args
 {
@@ -24,6 +28,7 @@ struct thread_args
   char* sourceKeyword;
   int isAorB;
   char* insertedKeyword;
+  char* outFile;
   int charCount;
   int lineCount;
   int startLine;
@@ -38,10 +43,10 @@ void *search();  //search <keyword> [-c] <inFile>
 //"-c" is optional. If included, the command also prints the number of  times 
 //the keyword has been found by printing the number on the screen.
 
-void replace(); //replace <targetKeyword> <sourceKeyword> [-c] <inFile>
+void *replace(); //replace <targetKeyword> <sourceKeyword> [-c] <inFile>
 //replaces of all occurrences of targetKeyword with sourceKeyword. 
 
-//void insert();  //insert <insertedkeyword> [-c] <-a OR -b> <targetkeyword> <inFile>
+void *insert();  //insert <insertedkeyword> [-c] <-a OR -b> <targetkeyword> <inFile>
 // nsert command inserts the "insertedKeyword" before or after each occurence of 
 //the targetKeyword. -a (after) or -b (before) arguments decide whether the 
 //insertedKeyword is placed before or after the targetKeyword. 
@@ -49,7 +54,7 @@ void replace(); //replace <targetKeyword> <sourceKeyword> [-c] <inFile>
 void *lineCount(); //lineCount <inFile>
 // Counts the number of lines in the input File and prints it
 
-void split();  //split <CharacterCount> <inFile>
+void *split();  //split <CharacterCount> <inFile>
 // Split command splits the lines in the input file into multiple lines. 
 //The output of the command is the same content as the input file, however
 // each line cannot have more than "CharacterCount" characters. If a line 
@@ -114,10 +119,29 @@ int main(int argc, char* argv[]){
 
     pthread_t tids[numberOfThreads];
 
-    if(numberOfColon>0 && numberOfSemiColon==0){  //Sequential Mode !!!!!!!!!!!!!
-      printf("Running in normal mode\n");
+    ////////////////////////////////////////////////////////////////////////////////////
+    // Single Sequential Mode
+    ///////////////////////////////////////////////////////////////////////////////////
 
-      char filename [WORD_LEN_MAX];
+
+    if(numberOfColon==0 && numberOfSemiColon==0){
+      printf("Running in single sequential mode\n");
+
+      char filename [WORD_LEN_MAX];       //get filename which is last str
+      strcpy(filename,commandArg[numberOfArgs-1]);
+
+
+
+    }
+
+    ////////////////////////////////////////////////////////////////////////////////////
+    // Multiple Sequential Mode (:)
+    ///////////////////////////////////////////////////////////////////////////////////
+
+    else if(numberOfColon>0 && numberOfSemiColon==0){  
+      printf("Running in multiple sequential mode\n");
+
+      char filename [WORD_LEN_MAX];       //get filename which is last str
       strcpy(filename,commandArg[numberOfArgs-1]);
 
       int start = 0, end = colon[0];
@@ -126,7 +150,7 @@ int main(int argc, char* argv[]){
         char args[10][WORD_LEN_MAX];
         
         if(i>=numberOfColon){
-          end = numberOfArgs;
+          end = numberOfArgs-1;
         }
         if(i<numberOfColon){
           end = colon[i];
@@ -141,7 +165,7 @@ int main(int argc, char* argv[]){
         if(strcmp(args[0],"lineCount")==0){
           
           struct thread_args lineCountArgs;
-          lineCountArgs.filename = args[1]; 
+          lineCountArgs.filename = filename; 
           
           pthread_create(&tids[i],NULL, lineCount,&lineCountArgs);
           pthread_join(tids[i],NULL);
@@ -151,7 +175,7 @@ int main(int argc, char* argv[]){
           
           struct thread_args tailArgs;
           tailArgs.charCount = atoi(args[1]);
-          tailArgs.filename = args[2];
+          tailArgs.filename = filename;
 
           pthread_create(&tids[i],NULL, tail,&tailArgs);
           pthread_join(tids[i],NULL);
@@ -161,18 +185,18 @@ int main(int argc, char* argv[]){
          
           struct thread_args headArgs;
           headArgs.charCount = atoi(args[1]);
-          headArgs.filename = args[2];
+          headArgs.filename = filename;
 
           pthread_create(&tids[i],NULL,head,&headArgs);
           pthread_join(tids[i],NULL);
         }
 
         else if(strcmp(args[0],"mid")==0){
-         //Problem with mid file does not open
-
+         
           struct thread_args midArgs;
-          
-          midArgs.filename = args[3];
+          midArgs.startLine = atoi(args[1]);
+          midArgs.endLine = atoi(args[2]);
+          midArgs.filename = filename;
 
           pthread_create(&tids[i],NULL,mid,&midArgs);
           pthread_join(tids[i],NULL);
@@ -182,14 +206,14 @@ int main(int argc, char* argv[]){
          
           struct thread_args searchArgs;
 
-          if(index==3){
+          if(index==2){
             searchArgs.keyword = args[1];
-            searchArgs.filename = args[2];
+            searchArgs.filename = filename;
             searchArgs.isCount = 0;
           }
-          else if(index == 4){
+          else if(index == 3){
             searchArgs.keyword = args[1];
-            searchArgs.filename = args[3];
+            searchArgs.filename = filename;
             searchArgs.isCount = 1;
           }
         
@@ -197,24 +221,81 @@ int main(int argc, char* argv[]){
           pthread_join(tids[i],NULL);
         }
 
-/*         else if(strcmp(args[0],"replace")==0){
+        else if(strcmp(args[0],"replace")==0){
          
           struct thread_args replaceArgs;
+          replaceArgs.filename = filename;
+          replaceArgs.targetKeyword = args[1];
+          replaceArgs.sourceKeyword = args[2];
+          replaceArgs.outFile = "temp.txt";
 
           if(index==3){
-            searchArgs.keyword = args[1];
-            searchArgs.filename = args[2];
-            searchArgs.isCount = 0;
+            replaceArgs.isCount = 0;
           }
           else if(index == 4){
-            searchArgs.keyword = args[1];
-            searchArgs.filename = args[3];
-            searchArgs.isCount = 1;
+            replaceArgs.isCount = 1;
+          }
+          else if(index == 5){
+            replaceArgs.isCount = 0;
+            replaceArgs.outFile = args[4];
+          }
+          else if(index == 6){
+            replaceArgs.isCount = 1;
+            replaceArgs.outFile = args[5];
           }
         
-          pthread_create(&tids[i],NULL,search,&searchArgs);
+          pthread_create(&tids[i],NULL,replace,&replaceArgs);
           pthread_join(tids[i],NULL);
-        } */
+        }
+
+        else if(strcmp(args[0],"split")==0){
+        
+          struct thread_args splitArgs;
+          splitArgs.filename = filename;
+          splitArgs.charCount = atoi(args[1]);
+          splitArgs.outFile = "temp.txt";
+
+          if(index == 4){
+            splitArgs.outFile = args[3];
+          }
+
+          pthread_create(&tids[i],NULL,split,&splitArgs);
+          pthread_join(tids[i],NULL);
+        }
+
+        else if(strcmp(args[0],"insert")==0){
+         
+          struct thread_args insertArgs;
+          insertArgs.filename = filename;
+          
+          if(index==4){
+            insertArgs.insertedKeyword = args[1];
+            insertArgs.targetKeyword = args[3];
+            insertArgs.isCount = 0;
+
+            if(strcmp(args[2],"-a")){
+              insertArgs.isAorB = 1;
+            }
+            else if(strcmp(args[2],"-b")){
+              insertArgs.isAorB = 0;
+            } 
+          }
+          else if(index == 5){
+            insertArgs.insertedKeyword = args[1];
+            insertArgs.targetKeyword = args[4];
+            insertArgs.isCount = 1;
+
+            if(strcmp(args[3],"-a")){
+              insertArgs.isAorB = 1;
+            }
+            else if(strcmp(args[3],"-b")){
+              insertArgs.isAorB = 0;
+            } 
+          }
+        
+          pthread_create(&tids[i],NULL,insert,&insertArgs);
+          pthread_join(tids[i],NULL);
+        }
         start = end+1;
         printf("\n----------------------------------------\n");
       }
@@ -282,13 +363,20 @@ void *search(void *ptr){
   fclose(fp);
 
 }
-void replace(char targetKeyword[], char sourceKeyword[], int isCount, char filename[]){
+void *replace(void *ptr){
+
+  struct thread_args *args = (struct thread_args *)ptr;
+  char *filename = args->filename;
+  char *targetKeyword = args->targetKeyword;
+  char *sourceKeyword = args->sourceKeyword;
+  int isCount = args->isCount;
+  char *outFile = args->outFile;
 
   FILE*fp;
   FILE*fp_temp;
 
   fp = fopen(filename,"r+");
-  fp_temp = fopen("temp.txt","w+");
+  fp_temp = fopen(outFile,"w+");
   int count = 0;
   
   if(fp == NULL){
@@ -300,7 +388,6 @@ void replace(char targetKeyword[], char sourceKeyword[], int isCount, char filen
 
   }
   
-
   else{
     
     char line[LINE_LEN_MAX];
@@ -331,8 +418,10 @@ void replace(char targetKeyword[], char sourceKeyword[], int isCount, char filen
         }
       }
     }
-    copyFile(fp,fp_temp);
-
+    if(strcmp(outFile,"temp.txt")==0){
+      copyFile(fp,fp_temp);
+    }
+    
     printf("\nSuccessfully replaced all occurrences of '%s' with '%s'.\n", targetKeyword, sourceKeyword);
     
     if(isCount == 1){
@@ -345,7 +434,14 @@ void replace(char targetKeyword[], char sourceKeyword[], int isCount, char filen
   //remove("temp.txt");
 
 }
-void insert(char insertedKeyword[], int isCount, int isAorB, char targetKeyword[], char filename[]){  
+void *insert(void *ptr){  
+
+  struct thread_args *args = (struct thread_args *)ptr;
+  char *filename = args->filename;
+  char *insertedKeyword = args->insertedKeyword;
+  char *targetKeyword = args->targetKeyword;
+  int isCount = args->isCount;
+  int isAorB = args->isAorB;
 
   FILE*fp;
   FILE*fp_temp;
@@ -364,7 +460,7 @@ void insert(char insertedKeyword[], int isCount, int isAorB, char targetKeyword[
   }
   
   else{
-    
+   
     char line[LINE_LEN_MAX];
     while(fgets(line, sizeof(line), fp) != NULL){
 
@@ -406,11 +502,12 @@ void insert(char insertedKeyword[], int isCount, int isAorB, char targetKeyword[
       printf("The word %s is inserted after %s",insertedKeyword,targetKeyword);
     }
     if(isAorB == 1){
-      printf("The word %s is inserted after %s",insertedKeyword,targetKeyword);
+      printf("The word %s is inserted before %s",insertedKeyword,targetKeyword);
     }
     if(isCount == 1){
       printf("%d times.", count);
     }
+    printf("\n");
   }
 
   copyFile(fp,fp_temp);
@@ -472,13 +569,18 @@ int lineCountWithReturn(char filename[]){
 
 }
 
-void split(int charCount, char filename[]){ 
+void *split(void *ptr){ 
+
+  struct thread_args *args = (struct thread_args *)ptr;
+  char *filename = args->filename;
+  int charCount = args->charCount;
+  char *outFile = args-> outFile;
 
   FILE*fp;
   FILE*fp_temp;
 
   fp = fopen(filename,"r+");
-  fp_temp = fopen("temp2.txt","w+");
+  fp_temp = fopen(outFile,"w+");
   int count = 0;
   
   if(fp == NULL){
@@ -514,8 +616,7 @@ void split(int charCount, char filename[]){
             p++;                                                           
         }                                                            
         word[j] = '\0';
-        printf("%s--",word);
-
+        
         if(currentLength+strlen(word)>charCount){
 
           fwrite("\n", 1, 1, fp_temp);
@@ -534,7 +635,10 @@ void split(int charCount, char filename[]){
       }
     }
 
-    copyFile(fp,fp_temp);
+    if(strcmp(outFile,"temp.txt")==0){
+      copyFile(fp,fp_temp);
+    }
+    
     fclose(fp);
     fclose(fp_temp);
 
