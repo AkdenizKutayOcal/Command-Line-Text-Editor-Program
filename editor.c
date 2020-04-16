@@ -1,5 +1,5 @@
 //  TO DO
-// 1- add > functionality for all commands
+// 1- add > functionality for all commands(added for insert, split, replace)
 // 2- replace "cow" "smt" remove "" from strings
 // 3- single sequential mode
 // 4- threaded mode
@@ -36,6 +36,7 @@ struct thread_args
 
 };
 
+pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 void *search();  //search <keyword> [-c] <inFile> 
 //The command searches the input file for the occurrence of 
@@ -118,6 +119,7 @@ int main(int argc, char* argv[]){
     numberOfThreads = numberOfColon+numberOfSemiColon+1;
 
     pthread_t tids[numberOfThreads];
+    
 
     ////////////////////////////////////////////////////////////////////////////////////
     // Single Sequential Mode
@@ -129,6 +131,7 @@ int main(int argc, char* argv[]){
 
       char filename [WORD_LEN_MAX];       //get filename which is last str
       strcpy(filename,commandArg[numberOfArgs-1]);
+
 
 
 
@@ -161,6 +164,9 @@ int main(int argc, char* argv[]){
         for(int k = start; k<end;k++){
           strcpy(args[index++],commandArg[k]);
         }
+
+        //////////////////////////////////////////////////////////
+        
         
         if(strcmp(args[0],"lineCount")==0){
           
@@ -267,6 +273,7 @@ int main(int argc, char* argv[]){
          
           struct thread_args insertArgs;
           insertArgs.filename = filename;
+          insertArgs.outFile = "temp.txt";
           
           if(index==4){
             insertArgs.insertedKeyword = args[1];
@@ -292,10 +299,41 @@ int main(int argc, char* argv[]){
               insertArgs.isAorB = 0;
             } 
           }
+
+          else if(index==6){  //with out file
+            insertArgs.insertedKeyword = args[1];
+            insertArgs.targetKeyword = args[3];
+            insertArgs.isCount = 0;
+            insertArgs.outFile = args[5];
+
+            if(strcmp(args[2],"-a")){
+              insertArgs.isAorB = 1;
+            }
+            else if(strcmp(args[2],"-b")){
+              insertArgs.isAorB = 0;
+            } 
+          }
+
+          else if(index == 7){  // with outfile and -c
+            insertArgs.insertedKeyword = args[1];
+            insertArgs.targetKeyword = args[4];
+            insertArgs.isCount = 1;
+            insertArgs.outFile = args[6];
+
+            if(strcmp(args[3],"-a")){
+              insertArgs.isAorB = 1;
+            }
+            else if(strcmp(args[3],"-b")){
+              insertArgs.isAorB = 0;
+            } 
+          }
         
           pthread_create(&tids[i],NULL,insert,&insertArgs);
           pthread_join(tids[i],NULL);
         }
+
+        /////////////////////////////////////////////////////////////////////////
+
         start = end+1;
         printf("\n----------------------------------------\n");
       }
@@ -361,7 +399,7 @@ void *search(void *ptr){
 
   }
   fclose(fp);
-
+  pthread_exit(NULL);
 }
 void *replace(void *ptr){
 
@@ -375,6 +413,12 @@ void *replace(void *ptr){
   FILE*fp;
   FILE*fp_temp;
 
+  // If output file is not given, lock critical section with mutex
+
+  if(strcmp(outFile,"temp.txt")==0){
+      pthread_mutex_lock(&mutex);
+  }
+    
   fp = fopen(filename,"r+");
   fp_temp = fopen(outFile,"w+");
   int count = 0;
@@ -420,6 +464,7 @@ void *replace(void *ptr){
     }
     if(strcmp(outFile,"temp.txt")==0){
       copyFile(fp,fp_temp);
+      pthread_mutex_unlock(&mutex);
     }
     
     printf("\nSuccessfully replaced all occurrences of '%s' with '%s'.\n", targetKeyword, sourceKeyword);
@@ -431,8 +476,9 @@ void *replace(void *ptr){
   
   fclose(fp);
   fclose(fp_temp);
-  //remove("temp.txt");
 
+  //remove("temp.txt");
+  pthread_exit(NULL);
 }
 void *insert(void *ptr){  
 
@@ -442,12 +488,19 @@ void *insert(void *ptr){
   char *targetKeyword = args->targetKeyword;
   int isCount = args->isCount;
   int isAorB = args->isAorB;
+  char *outFile = args->outFile;
 
   FILE*fp;
   FILE*fp_temp;
 
+  // If output file is not given, lock critical section with mutex
+
+  if(strcmp(outFile,"temp.txt")==0){
+      pthread_mutex_lock(&mutex);
+  }
+
   fp = fopen(filename,"r+");
-  fp_temp = fopen("temp3.txt","w+");
+  fp_temp = fopen(outFile,"w+");
   int count = 0;
   
   if(fp == NULL){
@@ -510,10 +563,14 @@ void *insert(void *ptr){
     printf("\n");
   }
 
-  copyFile(fp,fp_temp);
+  if(strcmp(outFile,"temp.txt")==0){
+      copyFile(fp,fp_temp);
+      pthread_mutex_unlock(&mutex);
+  }
+
   fclose(fp);
   fclose(fp_temp);
-  
+  pthread_exit(NULL);
 }  
 void *lineCount(void *ptr){
   // count +1 maybe
@@ -541,7 +598,7 @@ void *lineCount(void *ptr){
   }
   fclose(fp);
   printf("The file %s has Line Count = %d\n", filename, count);
-
+  pthread_exit(NULL);
 }
 int lineCountWithReturn(char filename[]){
   // count +1 maybe
@@ -578,6 +635,12 @@ void *split(void *ptr){
 
   FILE*fp;
   FILE*fp_temp;
+
+  // If output file is not given, lock critical section with mutex
+
+  if(strcmp(outFile,"temp.txt")==0){
+      pthread_mutex_lock(&mutex);
+  }
 
   fp = fopen(filename,"r+");
   fp_temp = fopen(outFile,"w+");
@@ -637,11 +700,12 @@ void *split(void *ptr){
 
     if(strcmp(outFile,"temp.txt")==0){
       copyFile(fp,fp_temp);
+      pthread_mutex_unlock(&mutex);
     }
     
     fclose(fp);
     fclose(fp_temp);
-
+    pthread_exit(NULL);
   }
 }
 
@@ -675,6 +739,7 @@ void *head(void *ptr){
 
     }
   }
+  pthread_exit(NULL);
 }
 void *tail( void *ptr){
   
@@ -708,7 +773,7 @@ void *tail( void *ptr){
       midAlter(startLine+1,totalLines,filename);
     }
   }
-
+  pthread_exit(NULL);
 }
 
 void *mid(void *ptr){
@@ -743,6 +808,7 @@ void *mid(void *ptr){
       }
     }
   }
+  pthread_exit(NULL);
 }
 
 void copyFile(FILE *in, FILE *out){
