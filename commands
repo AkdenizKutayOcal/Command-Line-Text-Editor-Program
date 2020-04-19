@@ -1,0 +1,7 @@
+mid 100 200 myFile.txt
+split 100 myFile.txt > out.txt
+replace Lorem Ipsum -c myFile.txt
+mid 100 200 : lineCount myFile.txt
+tail 5 : insert Ipsum -a Lorem > out.txt : lineCount myFile.txt
+head 100 ; lineCount myFile.txt
+mid 20 40 ; tail 8 ; split 80 myFile.txt

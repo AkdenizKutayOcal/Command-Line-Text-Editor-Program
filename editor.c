@@ -1,19 +1,9 @@
-//  TO DO
-// 1- add > functionality for all commands(added for insert, split, replace)
-// 2- replace "cow" "smt" remove "" from strings
-// 3- single sequential mode
-// 4- threaded mode
-
-// LOW PRIORITY
-// fix tail method to not use midAlter
-// make another mode to run commands with both : and ;
-// fix code inside main, It is a mess.
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
 #include <ctype.h>
+#include<sys/wait.h> 
 
 #define WORD_LEN_MAX 100
 #define LINE_LEN_MAX 512
@@ -34,12 +24,23 @@ struct thread_args
   int lineCount;
   int startLine;
   int endLine;
+  int mode;
+};
+
+struct command_args
+{
+
+  int startIndex;
+  int endIndex;
+  int totalNumberOfArgs;
+  int mode;
+
 };
 
 pthread_mutex_t mutex = PTHREAD_MUTEX_INITIALIZER;
 
 char commandArg[NUMBER_OF_COMMAND][WORD_LEN_MAX]; //holds all input arguments as an array seperated by spaces
-pthread_t tids[NUMBER_OF_COMMAND];
+
 
 void *search(); //search <keyword> [-c] <inFile>
 //The command searches the input file for the occurrence of
@@ -80,48 +81,40 @@ void copyFile(); // copyFile <inFile> <outFile>
 
 void midAlter();
 
-void commandProcess(int mode, int startIndex, int endIndex, int totalNumberOfArgs)
+void* commandProcess(void*ptr)
 {
+  struct command_args *args = (struct command_args *)ptr;
+  int startIndex = args->startIndex;
+  int endIndex = args->endIndex;
+  int totalNumberOfArgs = args->totalNumberOfArgs;
+  int mode = args->mode;
+
   int numberOfArgs = endIndex - startIndex;
 
   if (strcmp(commandArg[startIndex], "lineCount") == 0)
   {
     struct thread_args lineCountArgs;
     lineCountArgs.filename = commandArg[totalNumberOfArgs - 1];
-
-    if (mode == 0 || mode == 1)
-    {
-      lineCount(&lineCountArgs);
-    }
-    if (mode == 2)
-    {
-
-    }
-
-    /* pthread_create(&tids[i],NULL, lineCount,&lineCountArgs);
-    pthread_join(tids[i],NULL); */
+    
+    lineCount(&lineCountArgs);  
   }
 
   else if (strcmp(commandArg[startIndex], "split") == 0)
   {
 
-    printf("geldim");
     struct thread_args splitArgs;
     splitArgs.filename = commandArg[totalNumberOfArgs - 1];
     splitArgs.charCount = atoi(commandArg[startIndex + 1]);
     splitArgs.outFile = "temp.txt";
+    splitArgs.mode = mode;
 
     if (numberOfArgs == 4)
     {
       splitArgs.outFile = commandArg[startIndex + 3];
     }
 
-    if (mode == 0 || mode == 1)
-    {
-      split(&splitArgs);
-    }
-    /* pthread_create(&tids[i],NULL,split,&splitArgs);
-    pthread_join(tids[i],NULL); */
+    split(&splitArgs);
+    
   }
 
   else if (strcmp(commandArg[startIndex], "tail") == 0)
@@ -131,27 +124,18 @@ void commandProcess(int mode, int startIndex, int endIndex, int totalNumberOfArg
     tailArgs.charCount = atoi(commandArg[startIndex + 1]);
     tailArgs.filename = commandArg[totalNumberOfArgs - 1];
 
-    if (mode == 0 || mode == 1)
-    {
-      tail(&tailArgs);
-    }
-    //pthread_create(&tids[i],NULL, tail,&tailArgs);
-    //pthread_join(tids[i],NULL);
+    tail(&tailArgs);
+    
   }
 
   else if (strcmp(commandArg[startIndex], "head") == 0)
   {
-
+    
     struct thread_args headArgs;
     headArgs.charCount = atoi(commandArg[startIndex + 1]);
     headArgs.filename = commandArg[totalNumberOfArgs - 1];
 
-    if (mode == 0 || mode == 1)
-    {
-      head(&headArgs);
-    }
-    /* pthread_create(&tids[i],NULL,head,&headArgs);
-    pthread_join(tids[i],NULL); */
+    head(&headArgs);
   }
 
   else if (strcmp(commandArg[startIndex], "mid") == 0)
@@ -162,20 +146,14 @@ void commandProcess(int mode, int startIndex, int endIndex, int totalNumberOfArg
     midArgs.endLine = atoi(commandArg[startIndex + 2]);
     midArgs.filename = commandArg[totalNumberOfArgs - 1];
 
-    if (mode == 0 || mode == 1)
-    {
-      mid(&midArgs);
-    }
-
-    /* pthread_create(&tids[i],NULL,mid,&midArgs);
-    pthread_join(tids[i],NULL); */
+    mid(&midArgs);
   }
 
   else if (strcmp(commandArg[startIndex], "search") == 0)
   {
 
     struct thread_args searchArgs;
-
+    
     if (numberOfArgs == 2)
     {
       searchArgs.keyword = commandArg[startIndex + 1];
@@ -189,23 +167,17 @@ void commandProcess(int mode, int startIndex, int endIndex, int totalNumberOfArg
       searchArgs.isCount = 1;
     }
 
-    if (mode == 0 || mode == 1)
-    {
-      search(&searchArgs);
-    }
-
-    /* pthread_create(&tids[i],NULL,search,&searchArgs);
-    pthread_join(tids[i],NULL);*/
+    search(&searchArgs);
   }
 
   else if (strcmp(commandArg[startIndex], "replace") == 0)
   {
-
     struct thread_args replaceArgs;
     replaceArgs.filename = commandArg[totalNumberOfArgs - 1];
     replaceArgs.targetKeyword = commandArg[startIndex + 1];
     replaceArgs.sourceKeyword = commandArg[startIndex + 2];
     replaceArgs.outFile = "temp.txt";
+   
 
     if (numberOfArgs == 3)
     {
@@ -225,13 +197,9 @@ void commandProcess(int mode, int startIndex, int endIndex, int totalNumberOfArg
       replaceArgs.isCount = 1;
       replaceArgs.outFile = commandArg[startIndex + 5];
     }
-
-    if (mode == 0 || mode == 1)
-    {
-      replace(&replaceArgs);
-    }
-    /* pthread_create(&tids[i],NULL,replace,&replaceArgs);
-    pthread_join(tids[i],NULL); */
+    
+    replace(&replaceArgs);
+    
   }
 
   else if (strcmp(commandArg[startIndex], "insert") == 0)
@@ -240,9 +208,10 @@ void commandProcess(int mode, int startIndex, int endIndex, int totalNumberOfArg
     struct thread_args insertArgs;
     insertArgs.filename = commandArg[totalNumberOfArgs - 1];
     insertArgs.outFile = "temp.txt";
-
+   
     if (numberOfArgs == 4)
     {
+     
       insertArgs.insertedKeyword = commandArg[startIndex + 1];
       insertArgs.targetKeyword = commandArg[startIndex + 3];
       insertArgs.isCount = 0;
@@ -258,35 +227,76 @@ void commandProcess(int mode, int startIndex, int endIndex, int totalNumberOfArg
     }
     else if (numberOfArgs == 5)
     {
-      insertArgs.insertedKeyword = commandArg[startIndex + 1];
-      insertArgs.targetKeyword = commandArg[startIndex + 4];
-      insertArgs.isCount = 1;
+      if(endIndex==totalNumberOfArgs-1)
+      {
+        insertArgs.insertedKeyword = commandArg[startIndex + 1];
+        insertArgs.targetKeyword = commandArg[startIndex + 3];
+        insertArgs.isCount = 0;
 
-      if (strcmp(commandArg[startIndex + 3], "-a"))
-      {
-        insertArgs.isAorB = 1;
+        if (strcmp(commandArg[startIndex + 2], "-a"))
+        {
+          insertArgs.isAorB = 1;
+        }
+        else if (strcmp(commandArg[startIndex + 2], "-b"))
+        {
+          insertArgs.isAorB = 0;
+        }
+
       }
-      else if (strcmp(commandArg[startIndex + 3], "-b"))
+
+      else
       {
-        insertArgs.isAorB = 0;
+        insertArgs.insertedKeyword = commandArg[startIndex + 1];
+        insertArgs.targetKeyword = commandArg[startIndex + 4];
+        insertArgs.isCount = 1;
+
+        if (strcmp(commandArg[startIndex + 3], "-a"))
+        {
+          insertArgs.isAorB = 1;
+        }
+        else if (strcmp(commandArg[startIndex + 3], "-b"))
+        {
+          insertArgs.isAorB = 0;
+        }
       }
     }
 
     else if (numberOfArgs == 6)
-    { //with out file
-      insertArgs.insertedKeyword = commandArg[startIndex + 1];
-      insertArgs.targetKeyword = commandArg[startIndex + 3];
-      insertArgs.isCount = 0;
-      insertArgs.outFile = commandArg[startIndex + 5];
+    { 
 
-      if (strcmp(commandArg[startIndex + 2], "-a"))
+      if(endIndex == totalNumberOfArgs-1)//without output file
       {
-        insertArgs.isAorB = 1;
+        insertArgs.insertedKeyword = commandArg[startIndex + 1];
+        insertArgs.targetKeyword = commandArg[startIndex + 4];
+        insertArgs.isCount = 1;
+
+        if (strcmp(commandArg[startIndex + 3], "-a"))
+        {
+          insertArgs.isAorB = 1;
+        }
+        else if (strcmp(commandArg[startIndex + 3], "-b"))
+        {
+          insertArgs.isAorB = 0;
+        }
+
       }
-      else if (strcmp(commandArg[startIndex + 2], "-b"))
+      else//with output file
       {
-        insertArgs.isAorB = 0;
+        insertArgs.insertedKeyword = commandArg[startIndex + 1];
+        insertArgs.targetKeyword = commandArg[startIndex + 3];
+        insertArgs.isCount = 0;
+        insertArgs.outFile = commandArg[startIndex + 5];
+
+        if (strcmp(commandArg[startIndex + 2], "-a"))
+        {
+          insertArgs.isAorB = 1;
+        }
+        else if (strcmp(commandArg[startIndex + 2], "-b"))
+        {
+          insertArgs.isAorB = 0;
+        }
       }
+      
     }
 
     else if (numberOfArgs == 7)
@@ -306,12 +316,29 @@ void commandProcess(int mode, int startIndex, int endIndex, int totalNumberOfArg
       }
     }
 
-    if (mode == 0 || mode == 1)
-    {
-      insert(&insertArgs);
+    else if (numberOfArgs == 8)
+    { // with outfile and -c
+      insertArgs.filename = commandArg[startIndex + 5];
+      insertArgs.insertedKeyword = commandArg[startIndex + 1];
+      insertArgs.targetKeyword = commandArg[startIndex + 4];
+      insertArgs.isCount = 1;
+      insertArgs.outFile = commandArg[startIndex + 7];
+
+      if (strcmp(commandArg[startIndex + 3], "-a"))
+      {
+        insertArgs.isAorB = 1;
+      }
+      else if (strcmp(commandArg[startIndex + 3], "-b"))
+      {
+        insertArgs.isAorB = 0;
+      }
     }
-    /* pthread_create(&tids[i],NULL,insert,&insertArgs);
-    pthread_join(tids[i],NULL); */
+
+      insert(&insertArgs);
+  }
+
+  else{
+    printf("No such command exists. Please enter valid command.\n");
   }
 }
 
@@ -336,7 +363,7 @@ int main(int argc, char *argv[])
 
     int i = 0;
     int numberOfArgs = 0;
-   
+
     char *token = strtok(input, " ");
 
     while (token != NULL)
@@ -362,12 +389,13 @@ int main(int argc, char *argv[])
       else if (strcmp(commandArg[j], ";") == 0)
       {
 
-        semicolon[numberOfSemiColon++];
+        semicolon[numberOfSemiColon++] = j;
       }
     }
+   
 
     numberOfThreads = numberOfColon + numberOfSemiColon + 1;
-   
+    pthread_t tids[numberOfThreads];
     ////////////////////////////////////////////////////////////////////////////////////
     // Single Sequential Mode
     ///////////////////////////////////////////////////////////////////////////////////
@@ -377,8 +405,14 @@ int main(int argc, char *argv[])
 
       printf("Running in single sequential mode\n");
       int mode = 0;
+      struct command_args command;
+      command.startIndex = 0;
+      command.endIndex = numberOfArgs-1;
+      command.totalNumberOfArgs = numberOfArgs; 
+      command.mode = 0;
 
-      commandProcess(mode, 0, numberOfArgs - 1, numberOfArgs);
+      commandProcess(&command);
+
       printf("\n----------------------------------------\n");
     }
 
@@ -391,6 +425,7 @@ int main(int argc, char *argv[])
       printf("Running in multiple sequential mode\n");
 
       int start = 0, end = colon[0];
+      struct command_args commands [numberOfThreads];
       for (int i = 0; i < numberOfThreads; i++)
       {
 
@@ -403,7 +438,13 @@ int main(int argc, char *argv[])
           end = colon[i];
         }
 
-        commandProcess(1, start, end, numberOfArgs);
+
+        commands[i].startIndex = start;
+        commands[i].endIndex = end;
+        commands[i].totalNumberOfArgs = numberOfArgs; 
+        commands[i].mode = 0;
+      
+        commandProcess(&commands[i]);
 
         start = end + 1;
         printf("\n----------------------------------------\n");
@@ -418,14 +459,10 @@ int main(int argc, char *argv[])
     {
       printf("Running in Threaded mode\n");
 
-      char filename[WORD_LEN_MAX]; //get filename which is last str
-      strcpy(filename, commandArg[numberOfArgs - 1]);
-
+      struct command_args commands [numberOfThreads];
       int start = 0, end = semicolon[0];
       for (int i = 0; i < numberOfThreads; i++)
       {
-
-        char args[10][WORD_LEN_MAX];
 
         if (i >= numberOfSemiColon)
         {
@@ -436,22 +473,29 @@ int main(int argc, char *argv[])
           end = semicolon[i];
         }
 
-        int numberOfArgs = 0;
+        
+        commands[i].startIndex = start;
+        commands[i].endIndex = end;
+        commands[i].totalNumberOfArgs = numberOfArgs; 
+        commands[i].mode = 2;
+      
+        
+        int rc = pthread_create(&tids[i],NULL,commandProcess,&commands[i]);
 
-        for (int k = start; k < end; k++)
+        if(rc)			/* could not create thread */
         {
-          strcpy(args[numberOfArgs++], commandArg[k]);
+          printf("\n ERROR: return code from pthread_create is %d \n", rc);
+          exit(1);
         }
-
-        /////////////////////////////////////////////////////////////////////////
-
+        //printf("\n Created new thread (%lu) ... \n", tids[i]);
+        
         start = end + 1;
         printf("\n----------------------------------------\n");
       }
 
-      //////////////////////////////////////////////////////////////
       for (int i = 0; i < numberOfThreads; i++)
       {
+        //printf("\n Joined thread (%lu) ... \n", tids[i]);
         pthread_join(tids[i], NULL);
       }
     }
@@ -465,12 +509,11 @@ int main(int argc, char *argv[])
 
 void *search(void *ptr)
 {
-  // isCOunt == 0 when -c is not entered 1 otherwise
-
   struct thread_args *args = (struct thread_args *)ptr;
   char *filename = args->filename;
   char *keyword = args->keyword;
   int isCount = args->isCount;
+
 
   FILE *fp;
 
@@ -520,6 +563,7 @@ void *search(void *ptr)
     }
   }
   fclose(fp);
+
 }
 void *replace(void *ptr)
 {
@@ -530,6 +574,7 @@ void *replace(void *ptr)
   char *sourceKeyword = args->sourceKeyword;
   int isCount = args->isCount;
   char *outFile = args->outFile;
+
 
   FILE *fp;
   FILE *fp_temp;
@@ -596,10 +641,10 @@ void *replace(void *ptr)
 
   fclose(fp);
   fclose(fp_temp);
+
 }
 void *insert(void *ptr)
 {
-
   struct thread_args *args = (struct thread_args *)ptr;
   char *filename = args->filename;
   char *insertedKeyword = args->insertedKeyword;
@@ -607,6 +652,11 @@ void *insert(void *ptr)
   int isCount = args->isCount;
   int isAorB = args->isAorB;
   char *outFile = args->outFile;
+  int mode = args->mode;
+
+  if(strcmp(outFile, "temp.txt") == 0 && mode==2){
+    pthread_mutex_lock(&mutex);
+  }
 
   FILE *fp;
   FILE *fp_temp;
@@ -687,16 +737,25 @@ void *insert(void *ptr)
   if (strcmp(outFile, "temp.txt") == 0)
   {
     copyFile(fp, fp_temp);
+    if(mode==2)
+    {
+      pthread_mutex_unlock(&mutex);
+    }
   }
 
   fclose(fp);
   fclose(fp_temp);
+
+  /* if(mode==2){
+    
+  } */
 }
 void *lineCount(void *ptr)
 {
 
   struct thread_args *args = (struct thread_args *)ptr;
   char *filename = args->filename;
+  int mode = args->mode;
 
   int count = 1;
   FILE *fp;
@@ -728,9 +787,12 @@ void *split(void *ptr)
   char *filename = args->filename;
   int charCount = args->charCount;
   char *outFile = args->outFile;
+  int mode = args->mode;
 
-  printf("geldim\n");
-  printf("%s    %d   ", filename, charCount);
+  if(mode==2){
+    pthread_mutex_lock(&mutex);
+  }
+
   FILE *fp;
   FILE *fp_temp;
 
@@ -800,6 +862,10 @@ void *split(void *ptr)
 
     fclose(fp);
     fclose(fp_temp);
+
+    if(mode==2){
+      pthread_mutex_unlock(&mutex);
+    }
   }
 }
 
@@ -809,6 +875,7 @@ void *head(void *ptr)
   struct thread_args *args = (struct thread_args *)ptr;
   char *filename = args->filename;
   int lineCount = args->charCount;
+ 
 
   FILE *fp;
 
@@ -845,6 +912,7 @@ void *tail(void *ptr)
   struct thread_args *args = (struct thread_args *)ptr;
   char *filename = args->filename;
   int lineCount = args->charCount;
+ 
 
   FILE *fp;
 
@@ -876,6 +944,7 @@ void *tail(void *ptr)
       midAlter(startLine + 1, totalLines, filename);
     }
   }
+  
 }
 
 void *mid(void *ptr)
@@ -885,6 +954,7 @@ void *mid(void *ptr)
   char *filename = args->filename;
   int startLine = args->startLine;
   int endLine = args->endLine;
+  
 
   FILE *fp;
 
