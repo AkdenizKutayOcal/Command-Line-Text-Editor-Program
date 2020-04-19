@@ -88,9 +88,9 @@ commands and after creation of all threads finished, they all joined together.
 3- Known bugs or problems:
 
 I haven't been writing C code for a long time and using high level languages. Therefore, some parts
-of the code is poorly written and there are some bad code practices. That's Why this code is probably
+of the code is poorly written and there are some bad code practices. That's why this code probably
 have some bugs that I haven't discovered yet. Since I spend so much time trying to find foolish errors
-of mine, I did not have time to fix some problem problems eventhough I was aware of them. Here are some;
+of mine, I did not have time to fix some problems eventhough I was aware of them. Here are some;
 
 ->  I did not have time to check all errors so if user enters extreme inputs it will probably
     get segmentation fault. But I check errors for empty input, very large input, incorrect filename,
